@@ -3,6 +3,25 @@
 NLP Project 2.2 — Vasilis & Riccardo.
 RNN sequence-to-sequence translation on the Europarl v7 `it-en` parallel corpus.
 
+## Note on the data (please read first)
+
+I've set this repo up so you don't have to download anything. Here's the situation: the
+full Europarl corpus is two files of 285 MB and 311 MB, and GitHub hard-rejects any file
+over 100 MB, so the raw corpus simply cannot live in the repo — that part isn't a choice,
+it's a platform limit. What I did instead is commit the **10% sample** that the project
+brief tells us to train on (190,912 aligned sentence pairs), gzipped down to about 20 MB,
+which fits comfortably. This costs us nothing, because the raw corpus is only ever read by
+Task 1 to compute the corpus statistics and cut that sample — and both of those outputs
+are already committed here (`results/task1_outputs/` and `data/sample/`). Tasks 2 through 5
+read *only* the sample. So: **clone the repo, run the one `gunzip` command below, and you
+have everything you need to work.** The sample is cut with a fixed seed (42) and its row
+indices are saved in `data/sample/sample_idx.npy`, so we're both guaranteed to be training
+on the exact same data — which also covers the reproducibility the brief grades us on. The
+only reason you'd ever need the raw corpus is if you want to re-run Task 1 yourself, and
+there's a `wget` one-liner for that further down. One last thing: please **don't commit the
+uncompressed `sample.en` / `sample.it` or an `it-en/` folder** — the `.gitignore` already
+blocks them, and that's deliberate, so let's keep it that way.
+
 ## Quick start (no downloads needed)
 
 The **10% sample that all models train on is included in this repo** (gzipped).
@@ -37,6 +56,18 @@ notebooks/     one notebook per task
 data/sample/   the 10% sample (gzipped) + sample indices
 results/       figures and metrics per task, used in the report
 it-en/         raw corpus (git-ignored, download separately)
+```
+
+## Working together
+
+Jupyter notebooks merge badly in git — if we both edit the same `.ipynb`, git can't
+reconcile them and we get a wall of unreadable JSON conflicts. Easiest fix is to agree who
+owns which notebook and stay out of each other's files. Usual rhythm:
+
+```bash
+git pull                      # always, before starting work
+# ... work ...
+git add -A && git commit -m "what I did" && git push
 ```
 
 ## Corpus at a glance (full corpus, from Task 1)
