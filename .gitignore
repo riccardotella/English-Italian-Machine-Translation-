@@ -1,0 +1,28 @@
+# --- Data: never commit the corpus (too large for GitHub) ---
+# raw Europarl corpus (~600 MB)
+it-en/
+# 10% sample + any derived/preprocessed data (~40 MB+)
+data/
+*.tgz
+*.tar.gz
+
+# --- Model checkpoints / large artifacts ---
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.bin
+
+# --- Python / Jupyter ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# --- OS / editor cruft ---
+.DS_Store
+.idea/
+.vscode/
+
+# Note: results/ (small figures + CSVs) is intentionally tracked - part of the report deliverable.
