@@ -1,0 +1,10 @@
+,count,percentage
+total_pairs_before_preprocessing,190912,100.0
+empty_english_lines,326,0.1708
+empty_italian_lines,476,0.2493
+pairs_removed_because_empty,802,0.4201
+xml_like_english_lines,0,0.0
+xml_like_italian_lines,0,0.0
+pairs_removed_because_xml_like,0,0.0
+total_pairs_removed,802,0.4201
+total_pairs_after_preprocessing,190110,99.5799
