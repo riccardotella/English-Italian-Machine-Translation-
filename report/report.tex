@@ -11,6 +11,16 @@
 
 \usepackage{booktabs}
 \usepackage{graphicx}
+% Look for figures both in the repo's results folders and next to this file.
+% On Overleaf there is no results/ directory, so upload the PNGs into the
+% project root and the second path picks them up.
+\graphicspath{%
+  {../results/task1_outputs/}%
+  {../results/task2_outputs/}%
+  {../results/task3_outputs/}%
+  {../results/task4_outputs/}%
+  {./}%
+}
 
 \begin{document}
 
@@ -58,31 +68,54 @@ We use the Europarl v7 English--Italian parallel corpus, which contains
 \midrule
 Sentence pairs      & 1,909,115 & 1,909,115 \\
 Total tokens        & 49.7\,M   & 48.0\,M   \\
-Vocabulary (types)  & 275,537   & \textbf{426,025} \\
+Vocabulary (types)  & 88,040    & \textbf{170,625} \\
 Mean length (tokens)& 26.05     & 25.13 \\
 Median length       & 23        & 23 \\
 Max length          & 668       & 558 \\
 Empty lines         & 3,257     & 4,985 \\
+OOV rate at 10k vocab & 1.92\%    & \textbf{5.18\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The most informative asymmetry is lexical rather than positional. Italian uses
 slightly \emph{fewer} tokens than English on average (25.13 vs.\ 26.05) yet
-requires 55\% more distinct word types (426,025 vs.\ 275,537). This reflects
+requires 94\% more distinct word types (170,625 vs.\ 88,040). This reflects
 Italian's richer inflectional morphology: a single verb lemma surfaces as many
-conjugated forms, each a separate entry for a word-level model. Two practical
-consequences follow. First, under a fixed vocabulary cap the Italian side
-suffers more out-of-vocabulary loss, so generating Italian is harder than
-generating English -- a prediction we test in
-Section~\ref{sec:direction}. Second, it motivates the character-level model of
-Section~\ref{sec:char}, which avoids the vocabulary explosion entirely.
+conjugated forms, each a separate entry for a word-level model, whereas English
+marks the same distinctions with separate function words that are already in the
+vocabulary.
 
-We also note that the common assumption that Romance translations are longer
-than their Germanic sources does not hold at the token level here; it holds in
-characters, not words. Sentence lengths are strongly correlated across the two
-languages ($r = 0.946$), which makes length a clean axis for the error analysis
-in Section~\ref{sec:length}.
+This asymmetry is not merely descriptive; it sets a ceiling on what a word-level
+model can do. With the 10,000-type vocabulary used in Section~\ref{sec:nmt},
+5.18\% of Italian tokens fall outside the vocabulary against only 1.92\% of
+English ones. Every such token is emitted as \texttt{<unk>} and is an
+unrecoverable error, so the target side is intrinsically harder to generate than
+the source side. Two predictions follow, both tested later: translating
+\emph{into} English should outperform translating into Italian
+(Section~\ref{sec:direction}), and a character-level model, which has no
+vocabulary cap at all, should close part of the gap (Section~\ref{sec:char}).
+
+We note that these counts are sensitive to tokenisation. Splitting on whitespace
+alone conflates \texttt{session} with \texttt{session.}\ and inflates the type
+counts roughly threefold (to 275,537 and 426,025) while doubling the apparent
+OOV rate; the figures above separate punctuation.
+
+The length distributions themselves are close to identical
+(Figure~\ref{fig:length}): both peak around 20 tokens with a long right tail, and
+per-sentence lengths are strongly correlated across the two languages
+($r = 0.946$). Length is therefore a clean axis along which to analyse errors,
+which we use in Section~\ref{sec:length}. The long tail also motivates the length
+cap applied in Section~\ref{sec:nmt}: a small number of very long sentences
+(up to 668 tokens) would otherwise dominate padding and training cost.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{length_distribution.png}
+\caption{Sentence-length distributions, English vs.\ Italian (clipped at 80
+tokens). The two languages are closely matched in tokens per sentence.}
+\label{fig:length}
+\end{figure}
 
 Because the full corpus is too large to train on, we randomly sample 10\% of
 the aligned pairs (190,912 pairs, seed 42). Sampling is performed over

@@ -1,9 +1,11 @@
 metric,English,Italian
 sentence pairs,1909115.0,1909115.0
 total tokens,49732505.0,47983295.0
-vocabulary (types),275537.0,426025.0
+"vocabulary (types, tokenized)",88040.0,170625.0
+"vocabulary (types, naive split)",275537.0,426025.0
 mean sent length,26.05,25.13
 median sent length,23.0,23.0
 std sent length,15.35,14.97
 max sent length,668.0,558.0
 empty lines,3257.0,4985.0
+OOV % at 10k vocab,1.92,5.18
