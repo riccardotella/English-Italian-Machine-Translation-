@@ -195,12 +195,91 @@ improve every metric over random initialisation.
 
 \section{Attention}
 \label{sec:attn}
-% TODO (Vasilis): Task 4.
-% - describe the attention mechanism used (Bahdanau or Luong) and why
-% - table: with vs without attention, same data and hyperparameters
-% - attention heatmap figure for one sample sentence
-% - tie back: attention removes the fixed-context bottleneck, so the gain
-%   should be largest on LONG sentences - check that against Section 4.5.
+
+The models of Section~\ref{sec:nmt} compress the entire source sentence into a
+single fixed vector. We replace this with \textbf{Bahdanau (additive)
+attention}: at every decoding step $t$ the decoder scores all encoder states
+$h_1\dots h_S$ against its current state $s_t$,
+$e_{t,i} = v^\top\tanh(W_s s_t + W_h h_i)$, normalises the scores with a softmax
+into weights $\alpha_{t,i}$, and consumes the weighted sum
+$c_t=\sum_i \alpha_{t,i}h_i$. Scores at padded positions are set to $-\infty$
+before the softmax, so padding is never attended to. We chose the additive form
+over a dot product because it does not constrain encoder and decoder hidden
+sizes to match, and because its weights are sharper and therefore easier to
+interpret.
+
+To isolate the effect of attention we retrained the no-attention baseline
+alongside it, with identical data splits, vocabularies, hyperparameters
+(embedding 64, hidden 256, learning rate 0.001, batch 128, 12 epochs) and random
+seeds. The only difference between the two systems is the attention mechanism.
+Both are evaluated on the held-out test set.
+
+\begin{table}[t]
+\caption{Effect of attention, test set. Best per column in bold.}
+\label{tab:attention}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{Val.\ loss} & \textbf{BLEU} & \textbf{METEOR} & \textbf{min} \\
+\midrule
+LSTM, no attention & 3.79 & 4.16 & 18.76 & \textbf{2.2} \\
+LSTM + attention   & \textbf{3.36} & \textbf{7.68} & \textbf{27.07} & 5.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Attention improves BLEU from 4.16 to 7.68 ($+85\%$ relative) and METEOR from
+18.76 to 27.07 (Table~\ref{tab:attention}). The cost is training time: because
+the context now depends on the decoder state, the target sequence can no longer
+be pushed through the LSTM in a single call and must be decoded step by step,
+making an epoch roughly $2.6\times$ slower.
+
+\subsection{Where the gain comes from}
+\label{sec:attnlength}
+
+If the fixed context vector really is the bottleneck, its cost should grow with
+sentence length, and attention should therefore help long sentences most.
+Figure~\ref{fig:bleulen} confirms this prediction. The absolute gain rises
+monotonically across length buckets ($+2.9$, $+2.9$, $+3.6$, $+3.8$ BLEU), and
+in relative terms the effect is much starker: $+13\%$ for sentences of 1--4
+tokens against $+148\%$ for sentences of 15--20. Attention does not simply make
+the model uniformly better; it specifically repairs the degradation that the
+single-vector bottleneck causes on longer input.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{bleu_by_length.png}
+\caption{BLEU by source-sentence length, with and without attention. The
+advantage of attention grows with length, as the bottleneck explanation
+predicts.}
+\label{fig:bleulen}
+\end{figure}
+
+\subsection{What the model attends to}
+
+Figure~\ref{fig:heatmap} shows the weights $\alpha_{t,i}$ for one test sentence.
+A clear diagonal emerges, with individual weights reaching $0.9$: the model has
+learned an approximately monotonic word alignment between English and Italian
+even though it was never given alignment supervision. Alignment is a by-product
+of learning to translate. The example also shows that alignment quality and
+lexical quality are separable: the attention is well formed while the output
+still contains a repetition loop (\emph{parlare di parlare di}), a common
+failure of greedy decoding in an under-trained seq2seq model.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{attention_heatmap.png}
+\caption{Attention weights for a test sentence. Rows are generated Italian
+tokens, columns are source English tokens.}
+\label{fig:heatmap}
+\end{figure}
+
+Two caveats. First, the attention model reaches its best validation loss at
+epoch 8 and overfits thereafter, whereas the baseline's validation loss is still
+decreasing at epoch 12; both systems are reported at their best checkpoint, but
+the baseline had not fully converged under the shared epoch budget. The gap
+between 4.16 and 7.68 BLEU is far too large to be attributed to this. Second,
+all decoding is greedy; beam search would likely raise both systems and might
+narrow the gap.
 
 \section{Pivot Translation}
 \label{sec:pivot}

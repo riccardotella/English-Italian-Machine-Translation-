@@ -1,0 +1,32 @@
+{
+  "hyperparameters": {
+    "embedding_dimension": 64,
+    "hidden_dimension": 256,
+    "learning_rate": 0.001,
+    "batch_size": 128,
+    "epochs": 12,
+    "max_sentence_length": 20,
+    "vocabulary_size": 10000,
+    "attention": "Bahdanau (additive), masked",
+    "decoding": "greedy",
+    "device": "cuda"
+  },
+  "baseline": {
+    "BLEU": 4.160864728271209,
+    "METEOR": 18.761279331820194,
+    "validation_loss": 3.790189794367912,
+    "training_minutes": 2.182238193353017,
+    "best_epoch": 12
+  },
+  "attention": {
+    "BLEU": 7.678519393491626,
+    "METEOR": 27.07096379431678,
+    "validation_loss": 3.3601258231137807,
+    "training_minutes": 5.769051460425059,
+    "best_epoch": 8
+  },
+  "gain": {
+    "BLEU": 3.517654665220417,
+    "METEOR": 8.309684462496584
+  }
+}

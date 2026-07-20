@@ -1,0 +1,3 @@
+Model,Val. loss,BLEU,METEOR,Train (min)
+"LSTM, no attention",3.79,4.161,18.761,2.182
+LSTM + attention,3.36,7.679,27.071,5.769
