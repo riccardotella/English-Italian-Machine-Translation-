@@ -1,0 +1,180 @@
+% NLP Project 2.2 - English-Italian Machine Translation
+% ACM proceedings template (sigconf).
+%
+% 'nonacm' drops the copyright block and makes CCS/keywords optional,
+% and printacmref=false removes the ACM reference-format box.
+% Together these save roughly one full column - which we need for the 4-page limit.
+\documentclass[sigconf,nonacm]{acmart}
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\begin{document}
+
+\title{English--Italian Neural Machine Translation on Europarl}
+
+\author{Vasileios Lalos}
+\affiliation{\institution{TU Berlin}\country{}}
+\author{Riccardo Tella}
+\affiliation{\institution{TU Berlin}\country{}}
+
+\begin{abstract}
+We build and compare recurrent encoder--decoder models for English--Italian
+translation on the Europarl v7 corpus. Starting from a vanilla RNN baseline we
+show that a fixed context vector is the dominant failure mode, and address it
+progressively with context feeding, LSTM units, pre-trained embeddings and
+finally attention. We report BLEU and METEOR for every variant, compare both
+translation directions, contrast word- and character-level models, and analyse
+how performance degrades with sentence length. % TODO: add one sentence with the headline result once Tasks 4-5 are in.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+% Keep this SHORT - the writing suggestions explicitly warn against long
+% background sections. Three or four sentences is enough.
+Machine translation maps a sentence in a source language onto a sentence in a
+target language. Unlike classification there is no single correct output, so
+translation quality is measured by comparing system output against reference
+translations. We study English--Italian translation on the Europarl parallel
+corpus, focusing on how architectural and representational choices affect
+model behaviour rather than on maximising a single score.
+
+\section{Data and Exploratory Analysis}
+\label{sec:data}
+
+We use the Europarl v7 English--Italian parallel corpus, which contains
+1,909,115 line-aligned sentence pairs. Table~\ref{tab:corpus} summarises it.
+
+\begin{table}[t]
+\caption{Europarl v7 English--Italian corpus statistics (full corpus).}
+\label{tab:corpus}
+\begin{tabular}{lrr}
+\toprule
+ & \textbf{English} & \textbf{Italian} \\
+\midrule
+Sentence pairs      & 1,909,115 & 1,909,115 \\
+Total tokens        & 49.7\,M   & 48.0\,M   \\
+Vocabulary (types)  & 275,537   & \textbf{426,025} \\
+Mean length (tokens)& 26.05     & 25.13 \\
+Median length       & 23        & 23 \\
+Max length          & 668       & 558 \\
+Empty lines         & 3,257     & 4,985 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The most informative asymmetry is lexical rather than positional. Italian uses
+slightly \emph{fewer} tokens than English on average (25.13 vs.\ 26.05) yet
+requires 55\% more distinct word types (426,025 vs.\ 275,537). This reflects
+Italian's richer inflectional morphology: a single verb lemma surfaces as many
+conjugated forms, each a separate entry for a word-level model. Two practical
+consequences follow. First, under a fixed vocabulary cap the Italian side
+suffers more out-of-vocabulary loss, so generating Italian is harder than
+generating English -- a prediction we test in
+Section~\ref{sec:direction}. Second, it motivates the character-level model of
+Section~\ref{sec:char}, which avoids the vocabulary explosion entirely.
+
+We also note that the common assumption that Romance translations are longer
+than their Germanic sources does not hold at the token level here; it holds in
+characters, not words. Sentence lengths are strongly correlated across the two
+languages ($r = 0.946$), which makes length a clean axis for the error analysis
+in Section~\ref{sec:length}.
+
+Because the full corpus is too large to train on, we randomly sample 10\% of
+the aligned pairs (190,912 pairs, seed 42). Sampling is performed over
+\emph{indices} so that pair alignment is preserved, and the drawn indices are
+stored so the sample is exactly reproducible.
+
+\section{Preprocessing}
+\label{sec:prep}
+
+Preprocessing removes a sentence pair whenever \emph{either} side is unusable,
+which preserves alignment. We lowercase, normalise repeated whitespace, strip
+leading and trailing whitespace, drop empty pairs, and drop pairs containing
+XML-like lines. Of 190,912 pairs, 802 (0.42\%) were removed, all of them empty;
+this release of Europarl contains no XML-tag lines, so that filter was a
+no-op safety check.
+
+We deliberately \emph{retain} punctuation, numbers and stopwords, and apply
+neither stemming nor lemmatisation. This is the opposite of the choice one
+makes for text classification, and for a specific reason: in translation every
+token must be reproduced in the output. Function words carry grammatical
+information the decoder needs to generate, and stemming would destroy exactly
+the inflectional endings that Italian generation depends on.
+
+\section{Neural Machine Translation}
+\label{sec:nmt}
+
+% TODO (Riccardo): architecture description + justification.
+% Cover: embedding -> encoder RNN/LSTM -> fixed context -> decoder, teacher
+% forcing, greedy decoding, cross-entropy ignoring padding, Adam, grad clipping.
+
+Sentence pairs longer than 20 tokens on either side are discarded, leaving
+70,914 pairs, split 70/10/20 into training (49,641), validation (7,091) and
+test (14,182) sets with seed 42. Vocabularies of 10,000 types per language are
+built on the training split only. All models are evaluated with corpus BLEU and
+mean sentence-level METEOR, both on a 0--100 scale.
+
+\subsection{From vanilla RNN to LSTM}
+% TODO (Riccardo): the diagnostic narrative. This is the most valuable part of
+% the report - the failures matter more than the final number.
+The vanilla RNN encoder--decoder collapsed to a single generic output such as
+\texttt{la <unk>}. Training longer did not help and eventually overfitted.
+Table~\ref{tab:tuning} tracks the fixes.
+
+\begin{table}[t]
+\caption{Model development, validation set. Best per column in bold.}
+\label{tab:tuning}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Model} & \textbf{Val.\ loss} & \textbf{BLEU} & \textbf{METEOR} \\
+\midrule
+Context-fed RNN        & 4.208 & 1.84 & 11.11 \\
+LSTM, hidden 128       & 3.892 & 3.25 & 16.53 \\
+LSTM, hidden 256       & 3.782 & 3.92 & 18.23 \\
+LSTM 256 + Word2Vec    & \textbf{3.560} & \textbf{4.17} & \textbf{19.23} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Embeddings}
+% TODO: extend if FastText is added.
+Word2Vec (CBOW) embeddings trained on the training split only, then fine-tuned,
+improve every metric over random initialisation.
+
+\subsection{Translation direction}
+\label{sec:direction}
+% TODO (Riccardo): IT->EN results and comparison with EN->IT.
+% Link back to the morphology finding in Section 2.
+
+\subsection{Character-level model}
+\label{sec:char}
+% TODO (Riccardo): char model vs word model.
+
+\subsection{Effect of sentence length}
+\label{sec:length}
+% TODO: BLEU bucketed by source length. This directly answers the brief's
+% question "does the length of text impact the performance of the model?".
+
+\section{Attention}
+\label{sec:attn}
+% TODO (Vasilis): Task 4.
+% - describe the attention mechanism used (Bahdanau or Luong) and why
+% - table: with vs without attention, same data and hyperparameters
+% - attention heatmap figure for one sample sentence
+% - tie back: attention removes the fixed-context bottleneck, so the gain
+%   should be largest on LONG sentences - check that against Section 4.5.
+
+\section{Pivot Translation}
+\label{sec:pivot}
+% TODO (Vasilis): Task 5. Italian -> English -> Swedish.
+% Discuss error propagation: errors in IT->EN are inherited by EN->SV.
+
+\section{Conclusion}
+% TODO: 3-4 sentences. What changed the results most, what we would do next.
+
+\end{document}
