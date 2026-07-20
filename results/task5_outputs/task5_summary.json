@@ -1,0 +1,44 @@
+{
+  "data": {
+    "triples_total": 59524,
+    "train": 41668,
+    "validation": 5952,
+    "test": 11904,
+    "construction": "join it-en and sv-en on the shared English side"
+  },
+  "hyperparameters": {
+    "embedding_dimension": 64,
+    "hidden_dimension": 256,
+    "learning_rate": 0.001,
+    "batch_size": 128,
+    "epochs": 12,
+    "architecture": "Bahdanau attention seq2seq (Task 4)",
+    "decoding": "greedy",
+    "device": "cuda"
+  },
+  "results": {
+    "it_en_leg1": {
+      "BLEU": 10.681224191532968,
+      "METEOR": 32.22810436738294
+    },
+    "en_sv_leg2_oracle": {
+      "BLEU": 10.996920895947609,
+      "METEOR": 35.11543242998742
+    },
+    "pivot_it_en_sv": {
+      "BLEU": 5.949421382067817,
+      "METEOR": 22.861203909386248
+    },
+    "direct_it_sv": {
+      "BLEU": 6.058815766506302,
+      "METEOR": 25.08414309743251
+    }
+  },
+  "training_minutes": {
+    "it->en": 4.764850799242655,
+    "en->sv": 4.772296778361002,
+    "it->sv": 4.729182831446329
+  },
+  "pivot_cost_bleu_vs_direct": -0.10939438443848548,
+  "pivot_cost_bleu_vs_oracle": -5.047499513879792
+}

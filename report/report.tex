@@ -25,11 +25,14 @@
 % Look for figures both in the repo's results folders and next to this file.
 % On Overleaf there is no results/ directory, so upload the PNGs into the
 % project root and the second path picks them up.
+% Both layouts are covered: "results/..." is the Overleaf case (main.tex at the
+% project root next to results/), "../results/..." is the repo case (this file
+% lives in report/). Unknown paths are simply skipped, so listing both is safe.
 \graphicspath{%
-  {../results/task1_outputs/}%
-  {../results/task2_outputs/}%
-  {../results/task3_outputs/}%
-  {../results/task4_outputs/}%
+  {results/task1_outputs/}{results/task2_outputs/}%
+  {results/task3_outputs/}{results/task4_outputs/}{results/task5_outputs/}%
+  {../results/task1_outputs/}{../results/task2_outputs/}%
+  {../results/task3_outputs/}{../results/task4_outputs/}{../results/task5_outputs/}%
   {./}%
 }
 
@@ -311,8 +314,103 @@ narrow the gap.
 
 \section{Pivot Translation}
 \label{sec:pivot}
-% TODO (Vasilis): Task 5. Italian -> English -> Swedish.
-% Discuss error propagation: errors in IT->EN are inherited by EN->SV.
+
+A pivot language is an intermediary: to translate from A to B one translates
+A$\rightarrow$P and then P$\rightarrow$B. We build an Italian$\rightarrow$Swedish
+system pivoting through English.
+
+\subsection{Constructing an evaluation corpus}
+
+Europarl distributes bilingual corpora paired with English, so Italian--Swedish
+data does not exist, and \texttt{it-en} and \texttt{sv-en} are aligned
+\emph{independently}: line $n$ of one is not the same sentence as line $n$ of the
+other. Italian--Swedish references therefore have to be constructed before the
+task can be measured at all. Because both corpora transcribe the same
+parliamentary proceedings, a large share of English sentences occurs verbatim in
+both, so we join the two on their normalised English side. This recovers
+156,768 Italian--English--Swedish triples, of which 59,524 have all three sides
+within the 20-token cap used throughout, split 70/10/20 into 41,668 training,
+5,952 validation and 11,904 test triples.
+
+\subsection{Systems}
+
+All four systems use the attention architecture of Section~\ref{sec:attn} with
+identical hyperparameters, initialisation and splits, and each is evaluated on
+the same held-out triples. Besides the two legs and the pivot we train a
+\emph{direct} Italian$\rightarrow$Swedish model, and we additionally measure the
+second leg on \emph{reference} English rather than on the first leg's output.
+That last configuration is an oracle: it shares the second-leg model with the
+pivot and differs only in the quality of its input, so the difference between
+them isolates the error inherited from the first leg. The pivot itself is fed the
+first leg's own output, since using reference English would leak information no
+pivot has at inference time.
+
+\begin{table}[t]
+\caption{Pivot translation, test set. The oracle row shares its model with the
+pivot row and differs only in whether the English input is the reference or the
+first leg's output.}
+\label{tab:pivot}
+\begin{tabular}{llrr}
+\toprule
+\textbf{System} & \textbf{Target} & \textbf{BLEU} & \textbf{METEOR} \\
+\midrule
+IT$\rightarrow$EN (leg 1)              & EN & 10.68 & 32.23 \\
+EN$\rightarrow$SV (leg 2, oracle input)& SV & \textbf{11.00} & \textbf{35.12} \\
+IT$\rightarrow$EN$\rightarrow$SV (pivot)& SV & 5.95 & 22.86 \\
+IT$\rightarrow$SV (direct)             & SV & 6.06 & 25.08 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Error propagation}
+
+Taken separately the two legs are comparable in quality (BLEU 10.68 and 11.00),
+but chaining them yields only 5.95 --- the pivot retains just \textbf{54\% of the
+second leg's oracle performance}. The 5.05 BLEU lost between the oracle and the
+pivot cannot be attributed to the second-leg model, which is identical in both
+rows; it is caused entirely by errors the first leg makes and the second leg then
+treats as correct input. Figure~\ref{fig:pivot} shows the decomposition. This is
+the characteristic weakness of pivoting: quality is roughly multiplicative along
+the chain rather than additive, so two individually usable systems compose into a
+markedly weaker one, and no amount of second-leg capacity can recover information
+already destroyed upstream.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{pivot_error_propagation.png}
+\caption{Decomposing the pivot. The first bar is the second leg given perfect
+English; the second is the same model given the first leg's output. The gap is
+inherited error.}
+\label{fig:pivot}
+\end{figure}
+
+\subsection{Pivot versus direct translation}
+
+On BLEU the pivot is indistinguishable from the direct system (5.95 vs.\ 6.06, a
+gap of 0.11), which is a stronger result for pivoting than we expected. METEOR
+disagrees, favouring the direct system by 2.22 points (22.86 vs.\ 25.08). The
+disagreement is informative rather than contradictory: BLEU rewards exact n-gram
+matches and both systems are weak enough that few 4-grams match either way,
+whereas METEOR credits stem-level unigram overlap and so detects that the direct
+system recovers more of the reference content. Where the metrics do agree, the
+direct system is at least as good, which is the expected ordering.
+
+Two caveats qualify the comparison. First, the direct system is not a strong
+ceiling: it is trained on the same 41,668 triples as the legs, so it is limited
+by data volume rather than by the absence of an intermediate language, and a
+direct system trained on a larger Italian--Swedish corpus would very likely
+extend its advantage. Second, and for the same reason, the two legs here are
+trained on Italian--Swedish-aligned data, whereas the practical motivation for
+pivoting is precisely the case where no such data exists; a deployment would
+train each leg on its full bilingual corpus. Both choices were made to keep every
+system on an identical split so the comparison isolates the pivot mechanism, and
+they should be read as bounding the experiment rather than the method.
+
+The practical trade-off is nevertheless clear. Pivoting costs two models and two
+decoding passes at inference, and roughly halves quality relative to a
+well-supplied second leg, but it reaches a language pair for which no direct
+training data exists at all --- and here it did so at essentially no BLEU cost
+relative to what direct training on the available data achieved.
 
 \section{Conclusion}
 % TODO: 3-4 sentences. What changed the results most, what we would do next.
