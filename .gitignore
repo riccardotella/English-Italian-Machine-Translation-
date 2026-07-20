@@ -1,7 +1,9 @@
 # --- Data ---
-# Raw Europarl corpus (~600 MB): CANNOT be committed, GitHub rejects files >100 MB.
-# Task 1 regenerates everything from it; teammates do not need it (see README).
+# Raw Europarl corpora: CANNOT be committed, GitHub rejects files >100 MB.
+# it-en/ is ~595 MB (Tasks 1-4), sv-en/ is ~560 MB (Task 5 pivot).
+# Both are one wget away and teammates do not need them (see README).
 it-en/
+sv-en/
 *.tgz
 *.tar.gz
 
