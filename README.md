@@ -58,6 +58,21 @@ results/       figures and metrics per task, used in the report
 it-en/         raw corpus (git-ignored, download separately)
 ```
 
+## ⚠️ Open item before submission
+
+The Task 3 and Task 4 numbers are **not yet on a common footing** and must not be
+put in the same table until both of these are done:
+
+1. **BLEU scale.** Task 4 uses NLTK smoothing (`SmoothingFunction().method1`).
+   Task 3 currently uses unsmoothed `corpus_bleu`, which collapses to values like
+   `1e-231` when no 4-gram matches. Fixing this needs **no retraining** — just
+   re-run the evaluation on the saved Task 3 checkpoints.
+2. **Training data.** Task 4 was trained on the repaired Task 2 output; the Task 3
+   models predate the CSV-quoting fix (see `scripts/fix_task2_quoting.py`).
+
+There is a red DRAFT NOTE in `report/report.tex` covering the same point — it prints
+in the PDF on purpose. Set `\DRAFTfalse` to hide all draft notes before submitting.
+
 ## Working together
 
 Jupyter notebooks merge badly in git — if we both edit the same `.ipynb`, git can't
