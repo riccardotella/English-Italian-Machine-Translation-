@@ -101,14 +101,18 @@ marks the same distinctions with separate function words that are already in the
 vocabulary.
 
 This asymmetry is not merely descriptive; it sets a ceiling on what a word-level
-model can do. With the 10,000-type vocabulary used in Section~\ref{sec:nmt},
-5.18\% of Italian tokens fall outside the vocabulary against only 1.92\% of
-English ones. Every such token is emitted as \texttt{<unk>} and is an
-unrecoverable error, so the target side is intrinsically harder to generate than
-the source side. Two predictions follow, both tested later: translating
-\emph{into} English should outperform translating into Italian
-(Section~\ref{sec:direction}), and a character-level model, which has no
-vocabulary cap at all, should close part of the gap (Section~\ref{sec:char}).
+model can do. Capping the vocabulary at the 10,000 most frequent types leaves
+5.18\% of Italian tokens but only 1.92\% of English ones outside the vocabulary
+over the full corpus (Table~\ref{tab:corpus}). On the smaller training sample of
+Section~\ref{sec:nmt} the vocabulary is estimated from far fewer sentences and
+generalises less well, so the rates the models actually incur are roughly twice
+as high: 10.6\% for Italian against 6.0\% for English. Every out-of-vocabulary
+token is emitted as \texttt{<unk>} and is an unrecoverable error, so the target
+side is intrinsically harder to generate than the source side. Two predictions
+follow, both tested later: translating \emph{into} English should outperform
+translating into Italian (Section~\ref{sec:direction}), and a character-level
+model, which has no vocabulary cap at all, should close part of the gap
+(Section~\ref{sec:char}).
 
 We note that these counts are sensitive to tokenisation. Splitting on whitespace
 alone conflates \texttt{session} with \texttt{session.}\ and inflates the type
