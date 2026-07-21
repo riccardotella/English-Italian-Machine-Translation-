@@ -236,18 +236,21 @@ same data, seed and hardware; as a check, our baseline reproduces the
 Section~\ref{sec:nmt} result for the same architecture to within 0.3 BLEU,
 which cross-validates the two implementations.
 
-\draftnote{The Section~\ref{sec:nmt} and Section~\ref{sec:attn} numbers are
-\emph{not yet comparable} and must not be discussed together until two things
-are resolved. (1)~\textbf{BLEU scale}: this section uses NLTK smoothing
-(\texttt{method1}); Section~\ref{sec:nmt} currently uses unsmoothed
-\texttt{corpus\_bleu}, which collapses to values such as $10^{-231}$ when no
-4-gram matches. Re-scoring the saved Task~3 checkpoints with smoothing fixes
-this and needs no retraining. (2)~\textbf{Training data}: this section was
-trained on the repaired Task~2 output, whereas the Section~\ref{sec:nmt} models
-predate the CSV-quoting fix. Once both are done, state the cross-section
-comparison here and reconcile the two tables. If either is unfinished at
-submission time, say so explicitly in the text rather than implying the numbers
-are on a common footing.}
+\draftnote{Before comparing the Section~\ref{sec:nmt} and Section~\ref{sec:attn}
+numbers directly, one issue remains. \textbf{BLEU scale is NOT a problem}:
+Section~\ref{sec:attn} uses NLTK smoothing (\texttt{method1}) and
+Section~\ref{sec:nmt} does not, but on the full test set the two are identical
+(verified: 4.202 either way), because smoothing only affects n-gram orders with
+zero corpus-wide matches and the converged models always produce some 4-grams.
+The remaining issue is \textbf{training data}: the Section~\ref{sec:nmt} results
+were produced on Colab from a stale \texttt{data/processed} that still contained
+the CSV-quoting corruption (37\% of the committed Task~3 test lines are
+quote-wrapped), whereas Section~\ref{sec:attn} used the repaired data. Task~3
+should be re-run on the current (clean) committed data --- the notebook already
+reads it, so this only needs a re-run, ideally on GPU (\texttt{DEVICE} is
+currently hard-coded to \texttt{cpu}). Until then, do not put the two sections'
+BLEU in one table; if it cannot be redone in time, state in the text that the
+Task~3 numbers are on pre-fix data.}
 
 \begin{table}[t]
 \caption{Effect of attention, test set. Best per column in bold.}
