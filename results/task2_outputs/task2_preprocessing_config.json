@@ -1,8 +1,8 @@
 {
-  "input_english": "data\\sample\\sample.en",
-  "input_italian": "data\\sample\\sample.it",
-  "output_english": "data\\processed\\task2_clean.en",
-  "output_italian": "data\\processed\\task2_clean.it",
+  "input_english": "data/sample/sample.en",
+  "input_italian": "data/sample/sample.it",
+  "output_english": "data/processed/task2_clean.en",
+  "output_italian": "data/processed/task2_clean.it",
   "lowercase": true,
   "remove_empty_pairs": true,
   "remove_xml_tag_pairs": true,
