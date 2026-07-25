@@ -232,9 +232,9 @@ alongside it, with identical data splits, vocabularies, hyperparameters
 seeds. The only difference between the two systems is the attention mechanism.
 Both are evaluated on the held-out test set. Training the baseline here rather
 than reusing the Section~\ref{sec:nmt} model means both numbers come from the
-same data, seed and hardware; as a check, our baseline reproduces the
-Section~\ref{sec:nmt} result for the same architecture to within 0.3 BLEU,
-which cross-validates the two implementations.
+same data, seed and hardware, so the comparison isolates attention; the
+no-attention baseline lands in the same low single-digit BLEU range as the
+word-level models of Section~\ref{sec:nmt}, as expected for this architecture.
 
 \draftnote{Before comparing the Section~\ref{sec:nmt} and Section~\ref{sec:attn}
 numbers directly, one issue remains. \textbf{BLEU scale is NOT a problem}:
