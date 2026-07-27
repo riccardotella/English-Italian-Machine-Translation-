@@ -342,7 +342,51 @@ tokens, columns are source English tokens.}
 \section{Pivot Translation}
 \label{sec:pivot}
 
-% Task 5 (Pivot) --- to be filled in after the aligned re-run.
+Europarl provides Italian--English and Swedish--English data but no
+Italian--Swedish corpus. We therefore translate Italian to Swedish through
+English as a \emph{pivot}: Italian--English (leg~1) followed by
+English--Swedish (leg~2). Because the two corpora are aligned independently,
+line $n$ of one is not the translation of line $n$ of the other, so we build the
+missing evaluation corpus by joining them on their shared English side,
+yielding 131,225 Italian--English--Swedish triples with all sides within the
+40-token cap. These are split 70/10/20 with seed~42 into 91,858 training,
+13,122 validation and 26,245 test triples. All systems use the Task~4 attention
+architecture at the same configuration as Tasks~3 and~4 (embedding 128, hidden
+512, Word2Vec-initialised, 20 epochs).
+
+We compare four systems on the held-out test triples (Table~\ref{tab:pivot}):
+each leg on its own, the chained pivot, and a direct Italian--Swedish model
+trained on the same triples as an upper-bound comparator. The pivot reaches
+12.04 BLEU, essentially matching the direct model (12.13, a gap of only
+$0.09$)---so pivoting through English costs almost nothing relative to training
+directly on the same data.
+
+\begin{table}[h]
+\caption{Pivot translation on the held-out test triples. The oracle feeds leg~2
+the \emph{reference} English; the pivot feeds it leg~1's own output.}
+\label{tab:pivot}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrr}
+\toprule
+\textbf{System} & \textbf{BLEU} & \textbf{METEOR} \\
+\midrule
+IT$\rightarrow$EN (leg~1)                & 21.61 & 49.00 \\
+EN$\rightarrow$SV (leg~2, oracle input)  & 19.19 & 48.18 \\
+IT$\rightarrow$EN$\rightarrow$SV (pivot) & 12.04 & 36.30 \\
+IT$\rightarrow$SV (direct)               & \textbf{12.13} & \textbf{38.06} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The oracle row isolates error propagation. Giving leg~2 the \emph{reference}
+English yields 19.19 BLEU; feeding it leg~1's own output drops this to 12.04, so
+$7.15$ BLEU---about a third of the achievable quality---is lost purely to
+leg~1's mistakes, which the second leg cannot recover. The pivot retains only
+$62.7\%$ of the oracle's performance. Error propagation, not the pivoting idea
+itself, is therefore the real cost: the chain is close to a direct model
+because both are limited by the same modest data, but a stronger first leg would
+lift the whole pipeline.
 
 \section{Conclusion}
 
