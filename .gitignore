@@ -38,5 +38,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # Note: results/ (small figures + CSVs) is intentionally tracked - part of the report deliverable.
