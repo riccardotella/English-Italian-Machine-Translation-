@@ -470,6 +470,17 @@ training data exists at all --- and here it did so at essentially no BLEU cost
 relative to what direct training on the available data achieved.
 
 \section{Conclusion}
-% TODO: 3-4 sentences. What changed the results most, what we would do next.
+
+Across all experiments the recurrent unit and the fixed context vector were the
+decisive factors. Replacing the vanilla RNN with an LSTM and adding Word2Vec
+initialisation gave the largest gains among the word models, and attention, which
+removes the single-context bottleneck, produced the clearest improvement of all,
+most strongly on long sentences. The data itself set the harder direction:
+Italian's richer morphology makes it the more difficult target, so
+Italian$\rightarrow$English consistently outperformed the reverse. Pivoting
+through English reached a language pair with no direct data, at the cost of
+propagated first-leg errors. Natural next steps are attention combined with the
+full 40-token pipeline, sub-word tokenisation to cut the remaining
+out-of-vocabulary loss, and beam search in place of greedy decoding.
 
 \end{document}
