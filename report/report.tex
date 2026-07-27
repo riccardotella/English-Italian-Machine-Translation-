@@ -388,6 +388,16 @@ itself, is therefore the real cost: the chain is close to a direct model
 because both are limited by the same modest data, but a stronger first leg would
 lift the whole pipeline.
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{pivot_error_propagation.png}
+\caption{Cost of pivoting through English. Leg~2 given the reference English
+(oracle) reaches 19.2 BLEU; the pivot, fed leg~1's own output, drops to 12.0,
+matching the direct model (12.1). The gap between the oracle and the pivot is
+the error inherited from the first leg.}
+\label{fig:pivot}
+\end{figure}
+
 \section{Conclusion}
 
 Across all experiments, the single most important factor was the fixed-context
