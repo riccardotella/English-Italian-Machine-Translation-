@@ -19,7 +19,7 @@
 % disappear and nothing else about the document changes.
 % ---------------------------------------------------------------------------
 \newif\ifDRAFT
-\DRAFTtrue
+\DRAFTfalse
 \newcommand{\draftnote}[1]{\ifDRAFT\par\noindent%
   \textcolor{red}{\small\textbf{[DRAFT NOTE --- remove before submission]} #1}\par\fi}
 % Look for figures both in the repo's results folders and next to this file.
@@ -52,7 +52,11 @@ show that a fixed context vector is the dominant failure mode, and address it
 progressively with context feeding, LSTM units, pre-trained embeddings and
 finally attention. We report BLEU and METEOR for every variant, compare both
 translation directions, contrast word- and character-level models, and analyse
-how performance degrades with sentence length. % TODO: add one sentence with the headline result once Tasks 4-5 are in.
+how performance degrades with sentence length. The strongest word model
+(Italian$\rightarrow$English) reaches 9.6 BLEU, a controlled ablation shows
+attention improving BLEU by 85\% over an equivalent attention-free baseline, and
+an English-pivot system extends coverage to Italian$\rightarrow$Swedish, where
+error propagation is the dominant limitation.
 \end{abstract}
 
 \maketitle
@@ -152,56 +156,103 @@ the inflectional endings that Italian generation depends on.
 \section{Neural Machine Translation}
 \label{sec:nmt}
 
-% TODO (Riccardo): architecture description + justification.
-% Cover: embedding -> encoder RNN/LSTM -> fixed context -> decoder, teacher
-% forcing, greedy decoding, cross-entropy ignoring padding, Adam, grad clipping.
+We build recurrent encoder--decoder models that read a source sentence and
+generate the target one token at a time. The encoder embeds the source tokens and
+runs a recurrent network over them; its final state is passed to the decoder,
+which is fed the same context at each step and predicts the next target token.
+Training uses teacher forcing, cross-entropy loss that ignores padding, the Adam
+optimiser and gradient clipping; decoding at test time is greedy. Every model is
+evaluated with corpus BLEU and mean sentence-level METEOR (both on a 0--100
+scale).
 
-Sentence pairs longer than 20 tokens on either side are discarded, leaving
-70,914 pairs, split 70/10/20 into training (49,641), validation (7,091) and
-test (14,182) sets with seed 42. Vocabularies of 10,000 types per language are
-built on the training split only. All models are evaluated with corpus BLEU and
-mean sentence-level METEOR, both on a 0--100 scale.
+Sentence pairs longer than 40 tokens on either side are discarded, leaving
+157,519 pairs, split 70/10/20 into training (110,265), validation (15,751) and
+test (31,503) sets with seed 42. Vocabularies of 20,000 types per language are
+built on the training split only, using a tokenizer that separates punctuation.
 
-\subsection{From vanilla RNN to LSTM}
-% TODO (Riccardo): the diagnostic narrative. This is the most valuable part of
-% the report - the failures matter more than the final number.
-The vanilla RNN encoder--decoder collapsed to a single generic output such as
-\texttt{la <unk>}. Training longer did not help and eventually overfitted.
-Table~\ref{tab:tuning} tracks the fixes.
+\subsection{Architecture and hyperparameter tuning}
+
+We first confirmed that the recurrent unit is decisive. A vanilla RNN
+encoder--decoder trained poorly and produced generic output, whereas replacing
+the RNN cell with an LSTM improved every metric substantially at equal capacity.
+We then tuned the embedding and hidden sizes on the validation set, selecting the
+larger LSTM (embedding 128, hidden 512), and compared random against Word2Vec
+initialisation. Table~\ref{tab:tuning} tracks this progression on the validation
+set. The final configuration is a single-layer context-fed LSTM with embedding
+dimension 128, hidden dimension 512, learning rate 0.001, batch size 128 and
+Word2Vec-initialised embeddings, trained with early stopping on validation loss.
 
 \begin{table}[t]
-\caption{Model development, validation set. Best per column in bold.}
+\caption{Model development on the validation set (English$\rightarrow$Italian).
+Best per column in bold.}
 \label{tab:tuning}
 \begin{tabular}{lrrr}
 \toprule
 \textbf{Model} & \textbf{Val.\ loss} & \textbf{BLEU} & \textbf{METEOR} \\
 \midrule
-Context-fed RNN        & 4.208 & 1.84 & 11.11 \\
-LSTM, hidden 128       & 3.892 & 3.25 & 16.53 \\
-LSTM, hidden 256       & 3.782 & 3.92 & 18.23 \\
-LSTM 256 + Word2Vec    & \textbf{3.560} & \textbf{4.17} & \textbf{19.23} \\
+RNN (emb 64, hid 128)            & 4.273 & 1.89 & 13.19 \\
+LSTM (emb 64, hid 128)           & 3.814 & 4.83 & 22.26 \\
+LSTM (emb 128, hid 512)          & 3.531 & 6.80 & 26.68 \\
+LSTM (emb 128, hid 512) + Word2Vec & \textbf{3.251} & \textbf{7.20} & \textbf{28.25} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Embeddings}
-% TODO: extend if FastText is added.
-Word2Vec (CBOW) embeddings trained on the training split only, then fine-tuned,
-improve every metric over random initialisation.
+Initialising the encoder and decoder embeddings with Word2Vec (CBOW) vectors
+trained on the training split, rather than learning them from scratch, improves
+validation BLEU from 6.80 to 7.20 and METEOR from 26.68 to 28.25
+(Table~\ref{tab:tuning}), and lowers validation loss. We therefore use Word2Vec
+initialisation for the final models.
 
-\subsection{Translation direction}
+\subsection{Final results, translation direction and representation}
 \label{sec:direction}
-% TODO (Riccardo): IT->EN results and comparison with EN->IT.
-% Link back to the morphology finding in Section 2.
-
-\subsection{Character-level model}
 \label{sec:char}
-% TODO (Riccardo): char model vs word model.
+
+Table~\ref{tab:nmt} reports the selected models on the held-out test set.
+Translating \emph{into} English clearly outperforms translating into Italian
+(BLEU 9.60 vs.\ 7.26; METEOR 33.94 vs.\ 28.12). This confirms the prediction from
+Section~\ref{sec:data}: Italian is morphologically richer and carries the higher
+out-of-vocabulary burden, so generating it is the harder direction.
+
+A character-level model (same LSTM, trained on characters) removes the word
+vocabulary entirely, but does not translate this into higher quality: on
+English$\rightarrow$Italian it reaches only BLEU 3.86 against the word model's
+7.26. Operating over much longer character sequences makes the sequence-modelling
+problem harder, and the fixed context vector is a tighter bottleneck per unit of
+meaning; the removal of out-of-vocabulary tokens does not compensate.
+
+\begin{table}[t]
+\caption{Final models on the test set. Best per column in bold.}
+\label{tab:nmt}
+\begin{tabular}{llrr}
+\toprule
+\textbf{System} & \textbf{Unit} & \textbf{BLEU} & \textbf{METEOR} \\
+\midrule
+English$\rightarrow$Italian & word      & 7.26 & 28.12 \\
+Italian$\rightarrow$English & word      & \textbf{9.60} & \textbf{33.94} \\
+English$\rightarrow$Italian & character & 3.86 & 19.83 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Effect of sentence length}
 \label{sec:length}
-% TODO: BLEU bucketed by source length. This directly answers the brief's
-% question "does the length of text impact the performance of the model?".
+Translation quality falls sharply with source length
+(Figure~\ref{fig:t3length}). For the English$\rightarrow$Italian word model, BLEU
+drops from 36.8 on sentences of 1--5 tokens to 8.1 on sentences of 16--20 tokens.
+The character model degrades even faster (25.7 to 3.8 over the same range),
+consistent with a single fixed context vector struggling to carry longer inputs.
+This degradation is exactly what the attention mechanism of
+Section~\ref{sec:attn} is designed to address.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{task3_length.png}
+\caption{Test BLEU by source-sentence length for the word and character models.
+Quality declines steeply as sentences get longer.}
+\label{fig:t3length}
+\end{figure}
 
 \section{Attention}
 \label{sec:attn}
