@@ -87,7 +87,6 @@ Mean length (tokens)& 26.05     & 25.13 \\
 Median length       & 23        & 23 \\
 Max length          & 668       & 558 \\
 Empty lines         & 3,257     & 4,985 \\
-OOV rate at 10k vocab & 1.92\%    & \textbf{5.18\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -100,24 +99,17 @@ conjugated forms, each a separate entry for a word-level model, whereas English
 marks the same distinctions with separate function words that are already in the
 vocabulary.
 
-This asymmetry is not merely descriptive; it sets a ceiling on what a word-level
-model can do. Capping the vocabulary at the 10,000 most frequent types leaves
-5.18\% of Italian tokens but only 1.92\% of English ones outside the vocabulary
-over the full corpus (Table~\ref{tab:corpus}). On the smaller training sample of
-Section~\ref{sec:nmt} the vocabulary is estimated from far fewer sentences and
-generalises less well, so the rates the models actually incur are roughly twice
-as high: 10.6\% for Italian against 6.0\% for English. Every out-of-vocabulary
-token is emitted as \texttt{<unk>} and is an unrecoverable error, so the target
-side is intrinsically harder to generate than the source side. Two predictions
-follow, both tested later: translating \emph{into} English should outperform
-translating into Italian (Section~\ref{sec:direction}), and a character-level
-model, which has no vocabulary cap at all, should close part of the gap
-(Section~\ref{sec:char}).
-
-We note that these counts are sensitive to tokenisation. Splitting on whitespace
-alone conflates \texttt{session} with \texttt{session.}\ and inflates the type
-counts roughly threefold (to 275,537 and 426,025) while doubling the apparent
-OOV rate; the figures above separate punctuation.
+This asymmetry is not merely descriptive; it shapes what a word-level model can
+cover. Under the modelling pipeline used in Sections~\ref{sec:nmt}--\ref{sec:attn}
+(a 20{,}000-type vocabulary over 40-token pairs), 2.50\% of Italian test tokens
+fall outside the vocabulary against only 0.73\% of English ones. Both rates are
+low, but the asymmetry persists: the morphologically richer target is
+consistently harder to cover, and every out-of-vocabulary token is emitted as
+\texttt{<unk>} and is unrecoverable, so the target side is intrinsically harder
+to generate than the source side. Two predictions follow, both examined in
+Section~\ref{sec:nmt}: translating \emph{into} English should be easier than into
+Italian, and a character-level model, which has no word-vocabulary cap, sidesteps
+this out-of-vocabulary problem entirely.
 
 The length distributions themselves are close to identical
 (Figure~\ref{fig:length}): both peak around 20 tokens with a long right tail, and
@@ -226,15 +218,17 @@ over a dot product because it does not constrain encoder and decoder hidden
 sizes to match, and because its weights are sharper and therefore easier to
 interpret.
 
-To isolate the effect of attention we retrained the no-attention baseline
-alongside it, with identical data splits, vocabularies, hyperparameters
+This is a \emph{controlled ablation}: we train a no-attention baseline and an
+attention model with identical data splits, vocabularies, hyperparameters
 (embedding 64, hidden 256, learning rate 0.001, batch 128, 12 epochs) and random
-seeds. The only difference between the two systems is the attention mechanism.
-Both are evaluated on the held-out test set. Training the baseline here rather
-than reusing the Section~\ref{sec:nmt} model means both numbers come from the
-same data, seed and hardware, so the comparison isolates attention; the
-no-attention baseline lands in the same low single-digit BLEU range as the
-word-level models of Section~\ref{sec:nmt}, as expected for this architecture.
+seeds, so their difference isolates the contribution of attention. The
+configuration is a simplified, Task-3-style LSTM (20-token cap, 10k vocabulary,
+whitespace tokenisation) and is \emph{not} an exact reproduction of the final
+Task 3 pipeline of Section~\ref{sec:nmt} (40-token cap, 20k vocabulary, regex
+tokenisation, Word2Vec, larger LSTM); the absolute scores below are therefore
+not directly comparable with the Section~\ref{sec:nmt} numbers, and we do not
+place them in the same table. Both systems are evaluated on the same held-out
+test set.
 
 \draftnote{Before comparing the Section~\ref{sec:nmt} and Section~\ref{sec:attn}
 numbers directly, one issue remains. \textbf{BLEU scale is NOT a problem}:
@@ -337,7 +331,12 @@ parliamentary proceedings, a large share of English sentences occurs verbatim in
 both, so we join the two on their normalised English side. This recovers
 156,768 Italian--English--Swedish triples, of which 59,524 have all three sides
 within the 20-token cap used throughout, split 70/10/20 into 41,668 training,
-5,952 validation and 11,904 test triples.
+5,952 validation and 11,904 test triples. When two Italian sentences share the
+same English side we keep the first Swedish match; about 4.5\% of the resulting
+triples are exact duplicates (repeated boilerplate in the proceedings), which we
+did not remove, so a small share may be shared across the train/test split. This
+mildly inflates the absolute scores but does not affect the comparisons below,
+which are all made on the same split.
 
 \subsection{Systems}
 

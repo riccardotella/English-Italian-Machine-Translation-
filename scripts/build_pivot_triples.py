@@ -20,7 +20,7 @@ import gzip
 import re
 from pathlib import Path
 
-MAX_TOKENS = 40  # aligned with Task 3 and Task 4
+MAX_TOKENS = 20  # matches the cap used in Tasks 3-4
 
 
 def normalise(text: str) -> str:
@@ -66,6 +66,12 @@ def main() -> None:
     assert len(english_side) == len(italian_side), "Task 2 files are not aligned."
     print(f"IT-EN pairs from Task 2           : {len(english_side):,}")
 
+    # Join policy: english_to_swedish uses setdefault above, so each English
+    # sentence maps to its FIRST Swedish translation - a one-to-one join that
+    # avoids many-to-many blow-up. Note: ~4.5% of the resulting triples are exact
+    # duplicates (repeated boilerplate in the proceedings). The committed triples
+    # keep them; to remove them add `triples = list(dict.fromkeys(triples))` here
+    # (this changes the counts, so the Task 5 notebook must be re-run afterwards).
     triples = [
         (italian, english, english_to_swedish[english])
         for english, italian in zip(english_side, italian_side)
