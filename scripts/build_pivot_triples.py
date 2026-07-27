@@ -20,7 +20,7 @@ import gzip
 import re
 from pathlib import Path
 
-MAX_TOKENS = 20  # matches the cap used in Tasks 3-4
+MAX_TOKENS = 40  # aligned with Tasks 3-4
 
 
 def normalise(text: str) -> str:
