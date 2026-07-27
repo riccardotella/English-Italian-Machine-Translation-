@@ -46,7 +46,7 @@
 \affiliation{\institution{}\country{}}
 
 \begin{abstract}
-This work investigates recurrent neural machine translation on the Europarl v7 corpus. We compare RNN and LSTM encoder--decoders, embedding initialisations, translation directions, and word- and character-level representations using BLEU and METEOR as reference metrics. The Italian--English word model outperforms the English--Italian model, achieving 9.60 BLEU and 33.94 METEOR. Character-level modelling provides no improvement because of the longer sequences. Bahdanau attention increases English--Italian BLEU from 4.16 to 7.68, particularly benefiting longer sentences. Finally, Italian--Swedish pivot translation through English performs similarly to direct translation, although oracle analysis reveals substantial error propagation between its two stages.
+This work investigates recurrent neural machine translation on the Europarl v7 corpus. We compare RNN and LSTM encoder--decoders, embedding initialisations, translation directions, and word- and character-level representations using BLEU and METEOR as reference metrics. The Italian--English word model outperforms the English--Italian model, achieving 9.60 BLEU and 33.94 METEOR. Character-level modelling provides no improvement because of the longer sequences. Bahdanau attention increases English--Italian BLEU from 7.32 to 18.41, particularly benefiting longer sentences. Finally, Italian--Swedish pivot translation through English performs similarly to direct translation, although oracle analysis reveals substantial error propagation between its two stages.
 \end{abstract}
 
 
@@ -272,7 +272,72 @@ mechanism evaluated next.
 \section{Attention}
 \label{sec:attn}
 
-% Task 4 (Attention) --- to be filled in after the aligned re-run.
+We augment the fixed-context encoder--decoder of Section~\ref{sec:nmt} with
+\textbf{Bahdanau (additive) attention}. At each decoding step the decoder scores
+every encoder state against its current hidden state, normalises the scores with
+a softmax (padded positions masked to $-\infty$), and consumes the resulting
+weighted sum of encoder states, so the source is no longer squeezed through a
+single vector. To measure attention as an improvement over Task~3, both the
+no-attention baseline and the attention model use the \emph{identical} final
+Task~3 pipeline (40-token cap, 20{,}000-type vocabulary, 128-dimensional
+Word2Vec embeddings, hidden size 512, same split and seed); only the attention
+mechanism differs.
+
+On the held-out test set attention raises BLEU from 7.32 to 18.41 and METEOR
+from 28.01 to 43.69 (Table~\ref{tab:attention}). The no-attention baseline
+reproduces the Section~\ref{sec:nmt} English--Italian result (7.32 vs.\ 7.26),
+confirming that the two are on the same footing and that the large gain is due to
+attention alone. The cost is training time: because the context now depends on
+the decoder state, the target is decoded step by step, tripling the training time
+(166 vs.\ 53 minutes on a Tesla T4).
+
+\begin{table}[h]
+\caption{Effect of attention on the held-out test set. Best per column bold.}
+\label{tab:attention}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{System} & \textbf{BLEU} & \textbf{METEOR} & \textbf{Train (min)} \\
+\midrule
+LSTM, no attention & 7.32 & 28.01 & \textbf{52.8} \\
+LSTM + attention   & \textbf{18.41} & \textbf{43.69} & 166.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Where the gain comes from}
+
+If the fixed context vector is the bottleneck, attention should help longer
+sentences most. Figure~\ref{fig:bleulen} confirms this: the gain grows with
+source length, from $+7.0$ BLEU on 1--10-token inputs to $+11.6$ on 21--30 and
+$+11.5$ on 31--40. Without attention, BLEU collapses from 18.2 to 5.6 as
+sentences lengthen, whereas with attention it stays near 17--25 across all
+lengths. Attention specifically repairs the long-sentence degradation observed in
+Section~\ref{sec:length}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{bleu_by_length.png}
+\caption{Test BLEU by source length, with and without attention. The advantage
+of attention grows with sentence length.}
+\label{fig:bleulen}
+\end{figure}
+
+\subsection{What the model attends to}
+
+The attention weights for a sample sentence (Figure~\ref{fig:heatmap}) form a
+largely diagonal pattern: the model learns an approximately monotonic
+word alignment between English and Italian without any alignment supervision,
+with off-diagonal mass where the two languages reorder.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{attention_heatmap.png}
+\caption{Attention weights for a test sentence. Rows are generated Italian
+tokens, columns are source English tokens.}
+\label{fig:heatmap}
+\end{figure}
 
 \section{Pivot Translation}
 \label{sec:pivot}
