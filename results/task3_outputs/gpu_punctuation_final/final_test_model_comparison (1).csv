@@ -1,0 +1,4 @@
+direction,model,representation,architecture,embedding,test_examples,BLEU,METEOR,mean_generated_length,empty_translations_percentage,unique_translations,inference_minutes
+English_to_Italian,context_lstm_large_word2vec,word,LSTM,word2vec_initialisation,31503,7.264283611732051,28.115218297206454,23.931085928324286,0.0,30792,0.4131590590832881
+Italian_to_English,context_lstm_large_word2vec,word,LSTM,word2vec_initialisation,31503,9.59699032044573,33.93836323279735,26.4770656762848,0.0,30834,0.5247805428833316
+English_to_Italian,character_lstm,character,LSTM,learned_from_scratch,31503,3.861553979129781,19.828288799138566,25.456559692727676,0.0,30913,1.444282384766666

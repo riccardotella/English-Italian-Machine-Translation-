@@ -1,0 +1,3 @@
+model,representation,embedding,BLEU,METEOR
+word_lstm_large_word2vec,word,word2vec_initialisation,7.201163782885445,28.24866625814605
+character_lstm,character,learned_from_scratch,3.9590633985650117,20.015032358800966

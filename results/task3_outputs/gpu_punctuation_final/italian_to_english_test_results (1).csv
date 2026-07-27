@@ -1,0 +1,2 @@
+direction,model,test_examples,BLEU,METEOR,mean_generated_length,empty_translations_percentage,unique_translations,inference_minutes
+Italian_to_English,context_lstm_large_word2vec,31503,9.59699032044573,33.93836323279735,26.4770656762848,0.0,30834,0.5247805428833316
