@@ -331,7 +331,12 @@ parliamentary proceedings, a large share of English sentences occurs verbatim in
 both, so we join the two on their normalised English side. This recovers
 156,768 Italian--English--Swedish triples, of which 59,524 have all three sides
 within the 20-token cap used throughout, split 70/10/20 into 41,668 training,
-5,952 validation and 11,904 test triples.
+5,952 validation and 11,904 test triples. When two Italian sentences share the
+same English side we keep the first Swedish match; about 4.5\% of the resulting
+triples are exact duplicates (repeated boilerplate in the proceedings), which we
+did not remove, so a small share may be shared across the train/test split. This
+mildly inflates the absolute scores but does not affect the comparisons below,
+which are all made on the same split.
 
 \subsection{Systems}
 
