@@ -19,7 +19,7 @@
 % disappear and nothing else about the document changes.
 % ---------------------------------------------------------------------------
 \newif\ifDRAFT
-\DRAFTfalse
+\DRAFTtrue
 \newcommand{\draftnote}[1]{\ifDRAFT\par\noindent%
   \textcolor{red}{\small\textbf{[DRAFT NOTE --- remove before submission]} #1}\par\fi}
 % Look for figures both in the repo's results folders and next to this file.
@@ -41,446 +41,245 @@
 \title{English--Italian Neural Machine Translation on Europarl}
 
 \author{Vasileios Lalos}
-\affiliation{\institution{TU Berlin}\country{}}
-\author{Riccardo Tella}
-\affiliation{\institution{TU Berlin}\country{}}
+\affiliation{\institution{}\country{}}
+\author{Riccardo Tellarini}
+\affiliation{\institution{}\country{}}
 
 \begin{abstract}
-We build and compare recurrent encoder--decoder models for English--Italian
-translation on the Europarl v7 corpus. Starting from a vanilla RNN baseline we
-show that a fixed context vector is the dominant failure mode, and address it
-progressively with context feeding, LSTM units, pre-trained embeddings and
-finally attention. We report BLEU and METEOR for every variant, compare both
-translation directions, contrast word- and character-level models, and analyse
-how performance degrades with sentence length. The strongest word model
-(Italian$\rightarrow$English) reaches 9.6 BLEU, a controlled ablation shows
-attention improving BLEU by 85\% over an equivalent attention-free baseline, and
-an English-pivot system extends coverage to Italian$\rightarrow$Swedish, where
-error propagation is the dominant limitation.
+This work investigates recurrent neural machine translation on the Europarl v7 corpus. We compare RNN and LSTM encoder--decoders, embedding initialisations, translation directions, and word- and character-level representations using BLEU and METEOR as reference metrics. The Italian--English word model outperforms the English--Italian model, achieving 9.60 BLEU and 33.94 METEOR. Character-level modelling provides no improvement because of the longer sequences. Bahdanau attention increases English--Italian BLEU from 4.16 to 7.68, particularly benefiting longer sentences. Finally, Italian--Swedish pivot translation through English performs similarly to direct translation, although oracle analysis reveals substantial error propagation between its two stages.
 \end{abstract}
+
 
 \maketitle
 
 \section{Introduction}
-% Keep this SHORT - the writing suggestions explicitly warn against long
-% background sections. Three or four sentences is enough.
-Machine translation maps a sentence in a source language onto a sentence in a
-target language. Unlike classification there is no single correct output, so
-translation quality is measured by comparing system output against reference
-translations. We study English--Italian translation on the Europarl parallel
-corpus, focusing on how architectural and representational choices affect
-model behaviour rather than on maximising a single score.
+
+Recurrent encoder--decoder models provide a simple approach to neural machine translation, but their performance is affected by architecture, sentence representation, translation direction and source length.
+
+This project investigates these factors on the Europarl v7 corpus. After data exploration and preprocessing, we compare recurrent architectures, hyperparameters, embeddings, translation directions, and word- and character-level models. We then evaluate Bahdanau attention and Italian--Swedish pivot translation through English. All systems are assessed on held-out data using BLEU and METEOR, focusing on the causes of the observed performance differences.
 
 \section{Data and Exploratory Analysis}
-\label{sec:data}
+\label{sec}
 
-We use the Europarl v7 English--Italian parallel corpus, which contains
-1,909,115 line-aligned sentence pairs. Table~\ref{tab:corpus} summarises it.
+We use the Europarl v7 English--Italian parallel corpus, containing 1,909,115 line-aligned sentence pairs. Table~\ref{tab} reports the main statistics. Lengths and token totals use whitespace splitting, whereas word types and top-10k coverage exclude standalone punctuation.
 
-\begin{table}[t]
-\caption{Europarl v7 English--Italian corpus statistics (full corpus).}
-\label{tab:corpus}
+\begin{table}[h]
+\caption{Europarl v7 English--Italian corpus statistics.}
+\label{tab}
 \begin{tabular}{lrr}
 \toprule
- & \textbf{English} & \textbf{Italian} \\
+& \textbf{English} & \textbf{Italian} \\
 \midrule
-Sentence pairs      & 1,909,115 & 1,909,115 \\
-Total tokens        & 49.7\,M   & 48.0\,M   \\
-Vocabulary (types)  & 88,040    & \textbf{170,625} \\
-Mean length (tokens)& 26.05     & 25.13 \\
-Median length       & 23        & 23 \\
-Max length          & 668       & 558 \\
-Empty lines         & 3,257     & 4,985 \\
+Total tokens & 49.7,M & 48.0,M \\
+Word types & 88,040 & 170,625 \\
+Mean length & 26.05 & 25.13 \\
+Maximum length & 668 & 558 \\
+Tokens outside top 10k& 1.92\% & 5.18\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The most informative asymmetry is lexical rather than positional. Italian uses
-slightly \emph{fewer} tokens than English on average (25.13 vs.\ 26.05) yet
-requires 94\% more distinct word types (170,625 vs.\ 88,040). This reflects
-Italian's richer inflectional morphology: a single verb lemma surfaces as many
-conjugated forms, each a separate entry for a word-level model, whereas English
-marks the same distinctions with separate function words that are already in the
-vocabulary.
+Italian sentences are slightly shorter on average, but Italian requires 93.8\% more word types. This is consistent with its richer inflectional morphology and explains the larger proportion of tokens outside a fixed vocabulary. Although the final word models use a 20,000-token vocabulary, this asymmetry motivates the later comparisons of translation direction and character-level modelling.
 
-This asymmetry is not merely descriptive; it shapes what a word-level model can
-cover. Under the modelling pipeline used in Sections~\ref{sec:nmt}--\ref{sec:attn}
-(a 20{,}000-type vocabulary over 40-token pairs), 2.50\% of Italian test tokens
-fall outside the vocabulary against only 0.73\% of English ones. Both rates are
-low, but the asymmetry persists: the morphologically richer target is
-consistently harder to cover, and every out-of-vocabulary token is emitted as
-\texttt{<unk>} and is unrecoverable, so the target side is intrinsically harder
-to generate than the source side. Two predictions follow, both examined in
-Section~\ref{sec:nmt}: translating \emph{into} English should be easier than into
-Italian, and a character-level model, which has no word-vocabulary cap, sidesteps
-this out-of-vocabulary problem entirely.
+Sentence lengths are strongly correlated across languages ($r=0.946$), but both distributions have long tails (Figure~\ref{fig}). The very long sentences motivate the length restriction introduced before model training.
 
-The length distributions themselves are close to identical
-(Figure~\ref{fig:length}): both peak around 20 tokens with a long right tail, and
-per-sentence lengths are strongly correlated across the two languages
-($r = 0.946$). Length is therefore a clean axis along which to analyse errors,
-which we use in Section~\ref{sec:length}. The long tail also motivates the length
-cap applied in Section~\ref{sec:nmt}: a small number of very long sentences
-(up to 668 tokens) would otherwise dominate padding and training cost.
-
-\begin{figure}[t]
+\begin{figure}[h]
 \centering
 \includegraphics[width=\columnwidth]{length_distribution.png}
-\caption{Sentence-length distributions, English vs.\ Italian (clipped at 80
-tokens). The two languages are closely matched in tokens per sentence.}
-\label{fig:length}
+\caption{English and Italian sentence-length distributions, clipped at 80 whitespace tokens.}
+\label{fig}
 \end{figure}
 
-Because the full corpus is too large to train on, we randomly sample 10\% of
-the aligned pairs (190,912 pairs, seed 42). Sampling is performed over
-\emph{indices} so that pair alignment is preserved, and the drawn indices are
-stored so the sample is exactly reproducible.
+Following the project requirements, we randomly sample 10\% of the aligned corpus (190,912 pairs) using seed 42. Sampling and storing the selected indices preserve alignment and make the sample reproducible.
 
 \section{Preprocessing}
-\label{sec:prep}
+\label{sec}
 
-Preprocessing removes a sentence pair whenever \emph{either} side is unusable,
-which preserves alignment. We lowercase, normalise repeated whitespace, strip
-leading and trailing whitespace, drop empty pairs, and drop pairs containing
-XML-like lines. Of 190,912 pairs, 802 (0.42\%) were removed, all of them empty;
-this release of Europarl contains no XML-tag lines, so that filter was a
-no-op safety check.
+Preprocessing is applied at pair level to preserve alignment. We lowercase both languages to reduce case-related vocabulary sparsity and normalise whitespace to stabilise tokenisation. A pair is removed if either normalised side is empty or begins with \texttt{<}. This removes 802 of 190,912 pairs (0.42\%), all because of empty sides; no XML-like lines were found in the sample.
 
-We deliberately \emph{retain} punctuation, numbers and stopwords, and apply
-neither stemming nor lemmatisation. This is the opposite of the choice one
-makes for text classification, and for a specific reason: in translation every
-token must be reproduced in the output. Function words carry grammatical
-information the decoder needs to generate, and stemming would destroy exactly
-the inflectional endings that Italian generation depends on.
+We retain punctuation, numbers, stopwords and inflected surface forms, applying neither stemming nor lemmatisation, because these elements may carry lexical and grammatical information required for translation.
 
 \section{Neural Machine Translation}
 \label{sec:nmt}
 
-We build recurrent encoder--decoder models that read a source sentence and
-generate the target one token at a time. The encoder embeds the source tokens and
-runs a recurrent network over them; its final state is passed to the decoder,
-which is fed the same context at each step and predicts the next target token.
-Training uses teacher forcing, cross-entropy loss that ignores padding, the Adam
-optimiser and gradient clipping; decoding at test time is greedy. Every model is
-evaluated with corpus BLEU and mean sentence-level METEOR (both on a 0--100
-scale).
+After punctuation-aware tokenisation, pairs with more than 40
+whitespace-delimited words on either side are removed for computational
+tractability. This leaves 157,519 pairs, split with seed 42 into 110,265
+training (70\%), 15,751 validation (10\%) and 31,503 held-out test (20\%)
+pairs. English and Italian vocabularies contain the 20,000 most frequent
+training tokens, validation and test data therefore cannot influence them.
 
-Sentence pairs longer than 40 tokens on either side are discarded, leaving
-157,519 pairs, split 70/10/20 into training (110,265), validation (15,751) and
-test (31,503) sets with seed 42. Vocabularies of 20,000 types per language are
-built on the training split only, using a tokenizer that separates punctuation.
+As metrics for all the following experiments, we report corpus BLEU and mean sentence-level METEOR on a 0--100 scale. BLEU
+uses NLTK's method-1 smoothing. METEOR uses language-specific Snowball stemming
+but no synonym matching, because equivalent lexical resources were not
+available for both languages. Validation loss selects models, the test set is
+evaluated only once after all choices have been fixed.
 
-\subsection{Architecture and hyperparameter tuning}
+\subsection{Architecture and training}
 
-We first confirmed that the recurrent unit is decisive. A vanilla RNN
-encoder--decoder trained poorly and produced generic output, whereas replacing
-the RNN cell with an LSTM improved every metric substantially at equal capacity.
-We then tuned the embedding and hidden sizes on the validation set, selecting the
-larger LSTM (embedding 128, hidden 512), and compared random against Word2Vec
-initialisation. Table~\ref{tab:tuning} tracks this progression on the validation
-set. The final configuration is a single-layer context-fed LSTM with embedding
-dimension 128, hidden dimension 512, learning rate 0.001, batch size 128 and
-Word2Vec-initialised embeddings, trained with early stopping on validation loss.
+The baseline is a one-layer, unidirectional encoder--decoder with vanilla
+\texttt{tanh} RNN units. The encoder consumes dynamically padded packed
+sequences and represents the source by its final hidden state. The decoder is
+initialised with this state and, to strengthen source conditioning without
+introducing attention, concatenates the same fixed context vector to every
+target-token embedding. This simple recurrent baseline directly satisfies the
+task requirement and provides an interpretable reference point. We then replace
+the RNN units with LSTMs: their gated memory is better suited to dependencies
+across the retained 40-word sentences and alleviates vanishing gradients, while
+the single-layer fixed-context design remains unchanged for a controlled
+comparison.
 
-\begin{table}[t]
-\caption{Model development on the validation set (English$\rightarrow$Italian).
-Best per column in bold.}
+Training uses full teacher forcing, cross-entropy loss with padding ignored,
+Adam, batches of 128 and gradient clipping at norm 1.0. At inference, greedy
+decoding starts from \texttt{<sos>} and stops at \texttt{<eos>} or after 80
+tokens. Every run saves the checkpoint with minimum validation loss and uses
+early stopping with patience three.
+
+\subsection{Hyperparameter selection}
+
+We tune manually, changing recurrent capacity, embedding size and learning rate
+while keeping the data split, seed and training order fixed. All tuning runs use
+the complete training and validation sets for at most 15 epochs. The primary
+criterion is validation loss; BLEU and METEOR are diagnostic
+(Table~\ref{tab:tuning}). Among vanilla RNNs, 64-dimensional embeddings, hidden
+size 128 and learning rate 0.001 are best. Replacing this full-trained RNN with
+an otherwise equivalent LSTM raises validation BLEU from 1.89 to 4.83 and
+METEOR from 13.19 to 22.26. LSTM-specific tuning then selects
+128-dimensional embeddings, hidden size 512 and learning rate 0.001.
+
+\begin{table}[h]
+\caption{Manual tuning on the validation set. The selected configuration is
+bold; generation-score maxima are underlined.}
 \label{tab:tuning}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lrrr}
 \toprule
-\textbf{Model} & \textbf{Val.\ loss} & \textbf{BLEU} & \textbf{METEOR} \\
+\textbf{Model (emb./hid., lr)} &
+\textbf{Loss} & \textbf{BLEU} & \textbf{MET.} \\
 \midrule
-RNN (emb 64, hid 128)            & 4.273 & 1.89 & 13.19 \\
-LSTM (emb 64, hid 128)           & 3.814 & 4.83 & 22.26 \\
-LSTM (emb 128, hid 512)          & 3.531 & 6.80 & 26.68 \\
-LSTM (emb 128, hid 512) + Word2Vec & \textbf{3.251} & \textbf{7.20} & \textbf{28.25} \\
+RNN (64/64, .001)       & 4.444 & 0.96 & 10.68 \\
+RNN (64/128, .001)      & 4.287 & 1.87 & 13.26 \\
+RNN (64/128, .0005)     & 4.346 & 1.76 & 13.38 \\
+LSTM (64/256, .001)     & 3.661 & 5.96 & 24.93 \\
+LSTM (128/256, .001)    & 3.627 & 5.87 & 24.72 \\
+\textbf{LSTM (128/512, .001)} &
+\textbf{3.531} & 6.80 & 26.68 \\
+LSTM (128/512, .0005)   & 3.532 & \underline{7.24} & \underline{27.41} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Embeddings}
-Initialising the encoder and decoder embeddings with Word2Vec (CBOW) vectors
-trained on the training split, rather than learning them from scratch, improves
-validation BLEU from 6.80 to 7.20 and METEOR from 26.68 to 28.25
-(Table~\ref{tab:tuning}), and lowers validation loss. We therefore use Word2Vec
-initialisation for the final models.
 
-\subsection{Final results, translation direction and representation}
+The selected LSTM is compared with the same model initialised by separate
+English and Italian Word2Vec models trained only on the training split. We use
+CBOW, 128 dimensions, window five, minimum count two and 20 Word2Vec epochs;
+the transferred vectors cover 97.9\% of the English vocabulary and 100\% of the
+Italian vocabulary and remain trainable. Relative to embeddings learned from
+scratch, Word2Vec reduces validation loss from 3.5314 to 3.2506 and increases
+BLEU/METEOR from 6.80/26.68 to 7.20/28.25. It is therefore used by both final
+word-level systems.
+
+\subsection{Translation direction}
 \label{sec:direction}
+
+For Italian--English we swap source and target while retaining the same split,
+vocabularies, architecture, Word2Vec initialisation, hyperparameters and
+decoding procedure. It reaches 9.60 BLEU and 33.94 METEOR on the test set,
+against 7.26 and 28.12 for English--Italian (Table~\ref{tab:finalnmt}). The
+improvement may be explained by the fact that English has fewer inflected word
+forms and a lower OOV rate, making it easier for a capped word vocabulary to
+generate.
+
+\subsection{Character-level model}
 \label{sec:char}
 
-Table~\ref{tab:nmt} reports the selected models on the held-out test set.
-Translating \emph{into} English clearly outperforms translating into Italian
-(BLEU 9.60 vs.\ 7.26; METEOR 33.94 vs.\ 28.12). This confirms the prediction from
-Section~\ref{sec:data}: Italian is morphologically richer and carries the higher
-out-of-vocabulary burden, so generating it is the harder direction.
+The character model translates English to Italian with the same one-layer
+fixed-context LSTM, 128-dimensional learned embeddings and hidden size 512. Its
+training-only vocabularies contain 140 English and 136 Italian characters, so
+there is effectively no word-level OOV problem. However, targets reach 343
+characters and must be compressed into the same single context vector. The
+model scores only 3.86 BLEU and 19.83 METEOR, below the
+word model despite having fewer parameters (3.78\,M vs.\ 19.06\,M). It also
+requires considerably more time to train, suggesting
+that longer recurrent paths outweigh the vocabulary advantage. All timings in
+Table~\ref{tab:finalnmt} were measured on a Tesla T4.
 
-A character-level model (same LSTM, trained on characters) removes the word
-vocabulary entirely, but does not translate this into higher quality: on
-English$\rightarrow$Italian it reaches only BLEU 3.86 against the word model's
-7.26. Operating over much longer character sequences makes the sequence-modelling
-problem harder, and the fixed context vector is a tighter bottleneck per unit of
-meaning; the removal of out-of-vocabulary tokens does not compensate.
-
-\begin{table}[t]
-\caption{Final models on the test set. Best per column in bold.}
-\label{tab:nmt}
-\begin{tabular}{llrr}
+\begin{table}[h]
+\caption{Final held-out test results and elapsed time in minutes.}
+\label{tab:finalnmt}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
 \toprule
-\textbf{System} & \textbf{Unit} & \textbf{BLEU} & \textbf{METEOR} \\
+\textbf{System} & \textbf{BLEU} & \textbf{MET.} &
+\textbf{Train} & \textbf{Infer.} \\
 \midrule
-English$\rightarrow$Italian & word      & 7.26 & 28.12 \\
-Italian$\rightarrow$English & word      & \textbf{9.60} & \textbf{33.94} \\
-English$\rightarrow$Italian & character & 3.86 & 19.83 \\
+Word EN$\rightarrow$IT & 7.26 & 28.12 & 24.67 & 0.41 \\
+Word IT$\rightarrow$EN & \textbf{9.60} & \textbf{33.94} & 28.38 & 0.52 \\
+Character EN$\rightarrow$IT & 3.86 & 19.83 & 85.74 & 1.44 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Effect of sentence length}
+\subsection{Effect of sentence length and error analysis}
 \label{sec:length}
-Translation quality falls sharply with source length
-(Figure~\ref{fig:t3length}). For the English$\rightarrow$Italian word model, BLEU
-drops from 36.8 on sentences of 1--5 tokens to 8.1 on sentences of 16--20 tokens.
-The character model degrades even faster (25.7 to 3.8 over the same range),
-consistent with a single fixed context vector struggling to carry longer inputs.
-This degradation is exactly what the attention mechanism of
-Section~\ref{sec:attn} is designed to address.
+
+Translation quality falls sharply as the source grows
+(Table~\ref{tab:lengthnmt}). For the final English--Italian word model, BLEU
+drops from 36.76 on 1--5-token inputs to 8.09 on 16--20-token inputs; METEOR
+drops from 57.96 to 27.70. Italian--English and character-level translation show
+the same trend. This diagnostic covers tokenised source lengths
+1--20; longer sentences remain included in the overall test results but are not
+included in these four buckets.
+
+\begin{table}[h]
+\caption{Test BLEU by tokenised source length (W: word; C: character).}
+\label{tab:lengthnmt}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Tokens} & \textbf{EN--IT W} & \textbf{IT--EN W} &
+\textbf{EN--IT C} \\
+\midrule
+1--5   & 36.76 & 32.13 & 25.67 \\
+6--10  & 17.86 & 20.81 &  9.98 \\
+11--15 & 10.74 & 13.10 &  5.47 \\
+16--20 &  8.09 & 10.58 &  3.77 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 
 \begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{task3_length.png}
-\caption{Test BLEU by source-sentence length for the word and character models.
-Quality declines steeply as sentences get longer.}
-\label{fig:t3length}
+    \centering
+    \includegraphics[width=\columnwidth]{bleu_meteor_by_length.png}
+    \caption{BLEU and METEOR scores of the EN$\rightarrow$IT model for different source-sentence length ranges on the test set. Performance decreases as sentence length increases, highlighting the limitations of the fixed-context encoder--decoder architecture.}
+    \label{fig:lengthnmt}
 \end{figure}
+
+Qualitative inspection explains the low corpus scores. Short, formulaic
+Europarl expressions are often correct, but longer outputs replace source
+details with generic parliamentary language, confuse proper names and numbers,
+or repeat phrases until the decoding limit. Character outputs occasionally
+recover an exact inflected form missed by the word model, but also create
+plausible-looking non-words and repetitions. The consistent length degradation
+supports the fixed-vector bottleneck diagnosis and motivates the attention
+mechanism evaluated next.
 
 \section{Attention}
 \label{sec:attn}
 
-The models of Section~\ref{sec:nmt} compress the entire source sentence into a
-single fixed vector. We replace this with \textbf{Bahdanau (additive)
-attention}: at every decoding step $t$ the decoder scores all encoder states
-$h_1\dots h_S$ against its current state $s_t$,
-$e_{t,i} = v^\top\tanh(W_s s_t + W_h h_i)$, normalises the scores with a softmax
-into weights $\alpha_{t,i}$, and consumes the weighted sum
-$c_t=\sum_i \alpha_{t,i}h_i$. Scores at padded positions are set to $-\infty$
-before the softmax, so padding is never attended to. We chose the additive form
-over a dot product because it does not constrain encoder and decoder hidden
-sizes to match, and because its weights are sharper and therefore easier to
-interpret.
-
-This is a \emph{controlled ablation}: we train a no-attention baseline and an
-attention model with identical data splits, vocabularies, hyperparameters
-(embedding 64, hidden 256, learning rate 0.001, batch 128, 12 epochs) and random
-seeds, so their difference isolates the contribution of attention. The
-configuration is a simplified, Task-3-style LSTM (20-token cap, 10k vocabulary,
-whitespace tokenisation) and is \emph{not} an exact reproduction of the final
-Task 3 pipeline of Section~\ref{sec:nmt} (40-token cap, 20k vocabulary, regex
-tokenisation, Word2Vec, larger LSTM); the absolute scores below are therefore
-not directly comparable with the Section~\ref{sec:nmt} numbers, and we do not
-place them in the same table. Both systems are evaluated on the same held-out
-test set.
-
-\draftnote{Before comparing the Section~\ref{sec:nmt} and Section~\ref{sec:attn}
-numbers directly, one issue remains. \textbf{BLEU scale is NOT a problem}:
-Section~\ref{sec:attn} uses NLTK smoothing (\texttt{method1}) and
-Section~\ref{sec:nmt} does not, but on the full test set the two are identical
-(verified: 4.202 either way), because smoothing only affects n-gram orders with
-zero corpus-wide matches and the converged models always produce some 4-grams.
-The remaining issue is \textbf{training data}: the Section~\ref{sec:nmt} results
-were produced on Colab from a stale \texttt{data/processed} that still contained
-the CSV-quoting corruption (37\% of the committed Task~3 test lines are
-quote-wrapped), whereas Section~\ref{sec:attn} used the repaired data. Task~3
-should be re-run on the current (clean) committed data --- the notebook already
-reads it, so this only needs a re-run, ideally on GPU (\texttt{DEVICE} is
-currently hard-coded to \texttt{cpu}). Until then, do not put the two sections'
-BLEU in one table; if it cannot be redone in time, state in the text that the
-Task~3 numbers are on pre-fix data.}
-
-\begin{table}[t]
-\caption{Effect of attention, test set. Best per column in bold.}
-\label{tab:attention}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Model} & \textbf{Val.\ loss} & \textbf{BLEU} & \textbf{METEOR} & \textbf{min} \\
-\midrule
-LSTM, no attention & 3.79 & 4.16 & 18.76 & \textbf{2.2} \\
-LSTM + attention   & \textbf{3.36} & \textbf{7.68} & \textbf{27.07} & 5.8 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Attention improves BLEU from 4.16 to 7.68 ($+85\%$ relative) and METEOR from
-18.76 to 27.07 (Table~\ref{tab:attention}). The cost is training time: because
-the context now depends on the decoder state, the target sequence can no longer
-be pushed through the LSTM in a single call and must be decoded step by step,
-making an epoch roughly $2.6\times$ slower.
-
-\subsection{Where the gain comes from}
-\label{sec:attnlength}
-
-If the fixed context vector really is the bottleneck, its cost should grow with
-sentence length, and attention should therefore help long sentences most.
-Figure~\ref{fig:bleulen} confirms this prediction. The absolute gain rises
-monotonically across length buckets ($+2.9$, $+2.9$, $+3.6$, $+3.8$ BLEU), and
-in relative terms the effect is much starker: $+13\%$ for sentences of 1--4
-tokens against $+148\%$ for sentences of 15--20. Attention does not simply make
-the model uniformly better; it specifically repairs the degradation that the
-single-vector bottleneck causes on longer input.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{bleu_by_length.png}
-\caption{BLEU by source-sentence length, with and without attention. The
-advantage of attention grows with length, as the bottleneck explanation
-predicts.}
-\label{fig:bleulen}
-\end{figure}
-
-\subsection{What the model attends to}
-
-Figure~\ref{fig:heatmap} shows the weights $\alpha_{t,i}$ for one test sentence.
-A clear diagonal emerges, with individual weights reaching $0.9$: the model has
-learned an approximately monotonic word alignment between English and Italian
-even though it was never given alignment supervision. Alignment is a by-product
-of learning to translate. The example also shows that alignment quality and
-lexical quality are separable: the attention is well formed while the output
-still contains a repetition loop (\emph{parlare di parlare di}), a common
-failure of greedy decoding in an under-trained seq2seq model.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{attention_heatmap.png}
-\caption{Attention weights for a test sentence. Rows are generated Italian
-tokens, columns are source English tokens.}
-\label{fig:heatmap}
-\end{figure}
-
-Two caveats. First, the attention model reaches its best validation loss at
-epoch 8 and overfits thereafter, whereas the baseline's validation loss is still
-decreasing at epoch 12; both systems are reported at their best checkpoint, but
-the baseline had not fully converged under the shared epoch budget. The gap
-between 4.16 and 7.68 BLEU is far too large to be attributed to this. Second,
-all decoding is greedy; beam search would likely raise both systems and might
-narrow the gap.
+% Task 4 (Attention) --- to be filled in after the aligned re-run.
 
 \section{Pivot Translation}
 \label{sec:pivot}
 
-A pivot language is an intermediary: to translate from A to B one translates
-A$\rightarrow$P and then P$\rightarrow$B. We build an Italian$\rightarrow$Swedish
-system pivoting through English.
-
-\subsection{Constructing an evaluation corpus}
-
-Europarl distributes bilingual corpora paired with English, so Italian--Swedish
-data does not exist, and \texttt{it-en} and \texttt{sv-en} are aligned
-\emph{independently}: line $n$ of one is not the same sentence as line $n$ of the
-other. Italian--Swedish references therefore have to be constructed before the
-task can be measured at all. Because both corpora transcribe the same
-parliamentary proceedings, a large share of English sentences occurs verbatim in
-both, so we join the two on their normalised English side. This recovers
-156,768 Italian--English--Swedish triples, of which 59,524 have all three sides
-within the 20-token cap used throughout, split 70/10/20 into 41,668 training,
-5,952 validation and 11,904 test triples. When two Italian sentences share the
-same English side we keep the first Swedish match; about 4.5\% of the resulting
-triples are exact duplicates (repeated boilerplate in the proceedings), which we
-did not remove, so a small share may be shared across the train/test split. This
-mildly inflates the absolute scores but does not affect the comparisons below,
-which are all made on the same split.
-
-\subsection{Systems}
-
-All four systems use the attention architecture of Section~\ref{sec:attn} with
-identical hyperparameters, initialisation and splits, and each is evaluated on
-the same held-out triples. Besides the two legs and the pivot we train a
-\emph{direct} Italian$\rightarrow$Swedish model, and we additionally measure the
-second leg on \emph{reference} English rather than on the first leg's output.
-That last configuration is an oracle: it shares the second-leg model with the
-pivot and differs only in the quality of its input, so the difference between
-them isolates the error inherited from the first leg. The pivot itself is fed the
-first leg's own output, since using reference English would leak information no
-pivot has at inference time.
-
-\begin{table}[t]
-\caption{Pivot translation, test set. The oracle row shares its model with the
-pivot row and differs only in whether the English input is the reference or the
-first leg's output.}
-\label{tab:pivot}
-\begin{tabular}{llrr}
-\toprule
-\textbf{System} & \textbf{Target} & \textbf{BLEU} & \textbf{METEOR} \\
-\midrule
-IT$\rightarrow$EN (leg 1)              & EN & 10.68 & 32.23 \\
-EN$\rightarrow$SV (leg 2, oracle input)& SV & \textbf{11.00} & \textbf{35.12} \\
-IT$\rightarrow$EN$\rightarrow$SV (pivot)& SV & 5.95 & 22.86 \\
-IT$\rightarrow$SV (direct)             & SV & 6.06 & 25.08 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Error propagation}
-
-Taken separately the two legs are comparable in quality (BLEU 10.68 and 11.00),
-but chaining them yields only 5.95 --- the pivot retains just \textbf{54\% of the
-second leg's oracle performance}. The 5.05 BLEU lost between the oracle and the
-pivot cannot be attributed to the second-leg model, which is identical in both
-rows; it is caused entirely by errors the first leg makes and the second leg then
-treats as correct input. Figure~\ref{fig:pivot} shows the decomposition. This is
-the characteristic weakness of pivoting: quality is roughly multiplicative along
-the chain rather than additive, so two individually usable systems compose into a
-markedly weaker one, and no amount of second-leg capacity can recover information
-already destroyed upstream.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{pivot_error_propagation.png}
-\caption{Decomposing the pivot. The first bar is the second leg given perfect
-English; the second is the same model given the first leg's output. The gap is
-inherited error.}
-\label{fig:pivot}
-\end{figure}
-
-\subsection{Pivot versus direct translation}
-
-On BLEU the pivot is indistinguishable from the direct system (5.95 vs.\ 6.06, a
-gap of 0.11), which is a stronger result for pivoting than we expected. METEOR
-disagrees, favouring the direct system by 2.22 points (22.86 vs.\ 25.08). The
-disagreement is informative rather than contradictory: BLEU rewards exact n-gram
-matches and both systems are weak enough that few 4-grams match either way,
-whereas METEOR credits stem-level unigram overlap and so detects that the direct
-system recovers more of the reference content. Where the metrics do agree, the
-direct system is at least as good, which is the expected ordering.
-
-Two caveats qualify the comparison. First, the direct system is not a strong
-ceiling: it is trained on the same 41,668 triples as the legs, so it is limited
-by data volume rather than by the absence of an intermediate language, and a
-direct system trained on a larger Italian--Swedish corpus would very likely
-extend its advantage. Second, and for the same reason, the two legs here are
-trained on Italian--Swedish-aligned data, whereas the practical motivation for
-pivoting is precisely the case where no such data exists; a deployment would
-train each leg on its full bilingual corpus. Both choices were made to keep every
-system on an identical split so the comparison isolates the pivot mechanism, and
-they should be read as bounding the experiment rather than the method.
-
-The practical trade-off is nevertheless clear. Pivoting costs two models and two
-decoding passes at inference, and roughly halves quality relative to a
-well-supplied second leg, but it reaches a language pair for which no direct
-training data exists at all --- and here it did so at essentially no BLEU cost
-relative to what direct training on the available data achieved.
+% Task 5 (Pivot) --- to be filled in after the aligned re-run.
 
 \section{Conclusion}
-
-Across all experiments the recurrent unit and the fixed context vector were the
-decisive factors. Replacing the vanilla RNN with an LSTM and adding Word2Vec
-initialisation gave the largest gains among the word models, and attention, which
-removes the single-context bottleneck, produced the clearest improvement of all,
-most strongly on long sentences. The data itself set the harder direction:
-Italian's richer morphology makes it the more difficult target, so
-Italian$\rightarrow$English consistently outperformed the reverse. Pivoting
-through English reached a language pair with no direct data, at the cost of
-propagated first-leg errors. Natural next steps are attention combined with the
-full 40-token pipeline, sub-word tokenisation to cut the remaining
-out-of-vocabulary loss, and beam search in place of greedy decoding.
+% TODO: 3-4 sentences. What changed the results most, what we would do next.
 
 \end{document}
