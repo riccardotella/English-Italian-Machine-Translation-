@@ -41,3 +41,6 @@ __pycache__/
 .claude/
 
 # Note: results/ (small figures + CSVs) is intentionally tracked - part of the report deliverable.
+
+# Excel lock files
+~\$*

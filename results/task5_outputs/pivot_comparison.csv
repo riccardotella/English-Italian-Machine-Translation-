@@ -1,5 +1,5 @@
 System,Target,BLEU,METEOR
-IT->EN (leg 1),EN,10.68,32.23
-"EN->SV (leg 2, oracle input)",SV,11.0,35.12
-IT->EN->SV (pivot),SV,5.95,22.86
-IT->SV (direct),SV,6.06,25.08
+IT->EN (leg 1),EN,21.61,49.00
+"EN->SV (leg 2, oracle input)",SV,19.19,48.18
+IT->EN->SV (pivot),SV,12.04,36.30
+IT->SV (direct),SV,12.13,38.06

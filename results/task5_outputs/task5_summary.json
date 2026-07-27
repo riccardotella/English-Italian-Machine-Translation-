@@ -1,44 +1,58 @@
 {
   "data": {
-    "triples_total": 59524,
-    "train": 41668,
-    "validation": 5952,
-    "test": 11904,
+    "triples_total": 131225,
+    "train": 91858,
+    "validation": 13122,
+    "test": 26245,
     "construction": "join it-en and sv-en on the shared English side"
   },
   "hyperparameters": {
-    "embedding_dimension": 64,
-    "hidden_dimension": 256,
+    "embedding_dimension": 128,
+    "hidden_dimension": 512,
     "learning_rate": 0.001,
     "batch_size": 128,
-    "epochs": 12,
+    "epochs": 20,
+    "max_decode_length": 42,
+    "vocabulary_size": 20000,
+    "embedding_init": "Word2Vec (CBOW, per language, trained on train split)",
     "architecture": "Bahdanau attention seq2seq (Task 4)",
     "decoding": "greedy",
     "device": "cuda"
   },
   "results": {
     "it_en_leg1": {
-      "BLEU": 10.681224191532968,
-      "METEOR": 32.22810436738294
+      "BLEU": 21.614496374164368,
+      "METEOR": 48.99799573149152
     },
     "en_sv_leg2_oracle": {
-      "BLEU": 10.996920895947609,
-      "METEOR": 35.11543242998742
+      "BLEU": 19.190396321825986,
+      "METEOR": 48.17928132715616
     },
     "pivot_it_en_sv": {
-      "BLEU": 5.949421382067817,
-      "METEOR": 22.861203909386248
+      "BLEU": 12.040245984408429,
+      "METEOR": 36.300603005955736
     },
     "direct_it_sv": {
-      "BLEU": 6.058815766506302,
-      "METEOR": 25.08414309743251
+      "BLEU": 12.126593286631158,
+      "METEOR": 38.064692474970606
     }
   },
   "training_minutes": {
-    "it->en": 4.764850799242655,
-    "en->sv": 4.772296778361002,
-    "it->sv": 4.729182831446329
+    "it->en": 132.1,
+    "en->sv": 125.2,
+    "it->sv": 124.4
   },
-  "pivot_cost_bleu_vs_direct": -0.10939438443848548,
-  "pivot_cost_bleu_vs_oracle": -5.047499513879792
+  "best_epoch": {
+    "it->en": 5,
+    "en->sv": 4,
+    "it->sv": 4
+  },
+  "test_oov_rate_percent": {
+    "it": 2.5,
+    "en": 0.8,
+    "sv": 3.48
+  },
+  "pivot_cost_bleu_vs_direct": -0.09,
+  "pivot_cost_bleu_vs_oracle_leg1_errors": -7.15,
+  "pivot_retains_percent_of_oracle": 62.7
 }
