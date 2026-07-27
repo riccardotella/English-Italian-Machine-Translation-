@@ -345,6 +345,22 @@ tokens, columns are source English tokens.}
 % Task 5 (Pivot) --- to be filled in after the aligned re-run.
 
 \section{Conclusion}
-% TODO: 3-4 sentences. What changed the results most, what we would do next.
+
+Across all experiments, the single most important factor was the fixed-context
+bottleneck. On the base encoder--decoder, translation quality was modest and
+degraded sharply with sentence length, and replacing the vanilla RNN with an
+LSTM and initialising it with Word2Vec embeddings gave only incremental gains.
+Adding Bahdanau attention was decisive: English--Italian BLEU rose from 7.32 to
+18.41, with the largest improvements on the long sentences that the fixed
+context handled worst. Translation direction and representation mattered too ---
+into-English translation was consistently easier than into-Italian, reflecting
+Italian's richer morphology, while character-level modelling did not help
+because of the much longer sequences. Finally, Italian--Swedish pivot
+translation through English performed close to a direct model on BLEU, but the
+oracle analysis showed that a substantial part of the pivot's errors is inherited
+from the first leg, confirming that error propagation is the main cost of
+pivoting. The clearest direction for further work is therefore to carry attention
+into the pivot legs and to reduce first-leg errors, for example with beam search
+or a shared multilingual vocabulary.
 
 \end{document}
